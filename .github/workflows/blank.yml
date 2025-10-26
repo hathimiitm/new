@@ -1,0 +1,49 @@
+name: Daily Commit - DevSync
+
+# Trigger: daily schedule + manual run
+on:
+  schedule:
+    - cron: '15 02 * * *'  # Runs daily at 02:15 UTC (adjust as needed)
+  workflow_dispatch:        # Enables the "Run workflow" button
+
+# Permission to push commits
+permissions:
+  contents: write
+
+jobs:
+  daily-commit:
+    name: Daily commit job
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # Full history, required for commits
+
+      - name: "Set committer — 24f2005641@ds.study.iitm.ac.in"
+        run: |
+          git config user.name "DevSync Bot"
+          git config user.email "24f2005641@ds.study.iitm.ac.in"
+
+      - name: "Update daily activity file and commit"
+        env:
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p .github
+          echo "Daily update: $(date -u +"%Y-%m-%d %H:%M:%SZ") by run ${GITHUB_RUN_ID}" >> .github/daily-activity.log
+
+          git add .github/daily-activity.log
+
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "chore: daily activity update $(date -u +"%Y-%m-%d") [ci skip]"
+
+          # Push changes
+          BRANCH=${GITHUB_REF#refs/heads/}
+          git push "https://${TOKEN}@github.com/${REPO}.git" "HEAD:$BRANCH"
